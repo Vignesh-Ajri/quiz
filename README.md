@@ -23,7 +23,6 @@ Quiz/
         ├── components
         ├── contexts
         ├── pages
-        ├── routes
         └── utils
 ```
 
