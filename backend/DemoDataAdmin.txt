@@ -1,0 +1,41 @@
+{
+  title: "Basic SQL Quiz",
+  category: "Database",
+  timeLimit: 5,
+  discription:"Evaluate your knowledge of SQL"
+  questions: [
+    {
+      question: "Which SQL statement is used to extract data from a database?",
+      options: [
+        { text: "GET", isCorrect: false },
+        { text: "SELECT", isCorrect: true },
+        { text: "OPEN", isCorrect: false },
+        { text: "EXTRACT", isCorrect: false }
+      ],
+      explanation: "The SELECT statement is used to fetch data from a database.",
+      points: 2
+    },
+    {
+      question: "Which SQL clause is used to filter records?",
+      options: [
+        { text: "ORDER BY", isCorrect: false },
+        { text: "WHERE", isCorrect: true },
+        { text: "GROUP BY", isCorrect: false },
+        { text: "HAVING", isCorrect: false }
+      ],
+      explanation: "The WHERE clause filters records that meet a specific condition.",
+      points: 2
+    },
+    {
+      question: "Which command is used to remove all records from a table but keep its structure?",
+      options: [
+        { text: "DELETE", isCorrect: false },
+        { text: "DROP", isCorrect: false },
+        { text: "TRUNCATE", isCorrect: true },
+        { text: "REMOVE", isCorrect: false }
+      ],
+      explanation: "TRUNCATE removes all rows from a table but keeps the table structure.",
+      points: 2
+    }
+  ]
+}
