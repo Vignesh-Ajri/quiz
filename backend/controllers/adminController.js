@@ -1,290 +1,124 @@
 const User = require('../models/User');
 const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
-const QuizAttempt = require('../models/QuizAttempt');
+const Attempt = require('../models/QuizAttempt');
+const { sendSuccess, sendError, sendPaginated } = require('../utils/response');
 
-// ===============================
-// USER MANAGEMENT
-// ===============================
-
-// Get all users with statistics
-const getAllUsers = async (req, res) => {
+// GET /api/v1/admin/stats
+const getStats = async (req, res, next) => {
   try {
-    const users = await User.find().select('-password');
+    const [totalUsers, totalQuizzes, totalAttempts, categories] = await Promise.all([
+      User.countDocuments({ role: 'student' }),
+      Quiz.countDocuments(),
+      Attempt.countDocuments({ status: 'submitted' }),
+      Category.countDocuments({ isPublished: true }),
+    ]);
 
-    const usersWithStats = await Promise.all(
-      users.map(async (user) => {
-        const attempts = await QuizAttempt.find({ userId: user._id });
-        const quizzesAttempted = attempts.length;
-        const averageScore =
-          attempts.length > 0
-            ? Math.round(
-                attempts.reduce((sum, attempt) => sum + attempt.score, 0) /
-                  attempts.length
-              )
-            : 0;
+    const avgScoreResult = await Attempt.aggregate([
+      { $match: { status: 'submitted' } },
+      { $group: { _id: null, avg: { $avg: '$percentage' } } },
+    ]);
+    const avgScore = avgScoreResult.length > 0 ? Math.round(avgScoreResult[0].avg) : 0;
 
-        return {
-          ...user.toObject(),
-          quizzesAttempted,
-          averageScore,
-        };
-      })
-    );
+    // Recent 7 days attempts
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentAttempts = await Attempt.aggregate([
+      { $match: { status: 'submitted', createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
 
-    res.json(usersWithStats);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    return sendSuccess(res, {
+      totalUsers,
+      totalQuizzes,
+      totalAttempts,
+      totalCategories: categories,
+      avgScore,
+      recentAttempts,
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Create new user
-const createUser = async (req, res) => {
+// GET /api/v1/admin/users
+const getUsers = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { page = 1, limit = 20, search } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const filter = {};
+    if (search) filter.$or = [{ name: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }];
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: 'User with this email already exists' });
-    }
+    const [users, total] = await Promise.all([
+      User.find(filter).select('-password -refreshToken').sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      User.countDocuments(filter),
+    ]);
 
-    const user = new User({ name, email, password, role });
-    await user.save();
-
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+    return sendPaginated(res, users, { page: Number(page), limit: Number(limit), total, totalPages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Update user
-const updateUser = async (req, res) => {
+// PATCH /api/v1/admin/users/:id
+const updateUser = async (req, res, next) => {
   try {
-    const { name, email, role, isActive } = req.body;
+    const { role, isActive } = req.body;
+    const updates = {};
+    if (role) updates.role = role;
+    if (isActive !== undefined) updates.isActive = isActive;
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, email, role, isActive },
-      { new: true, runValidators: true }
-    );
+    const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select('-password -refreshToken');
+    if (!user) return sendError(res, 'User not found', 404, 'NOT_FOUND');
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json(user);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+    return sendSuccess(res, { user }, 'User updated');
+  } catch (err) {
+    next(err);
   }
 };
 
-// Delete user
-const deleteUser = async (req, res) => {
+// GET /api/v1/admin/quizzes  (with attempt stats)
+const getQuizzes = async (req, res, next) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Delete all quiz attempts by this user
-    await QuizAttempt.deleteMany({ userId: req.params.id });
-
-    res.json({ message: 'User deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// ===============================
-// QUIZ MANAGEMENT
-// ===============================
-
-// Get all quizzes with statistics
-const getAllQuizzes = async (req, res) => {
-  try {
-    const quizzes = await Quiz.find()
-      .populate('category', 'name');
+    const [quizzes, total] = await Promise.all([
+      Quiz.find()
+        .populate('categoryId', 'name')
+        .populate('createdBy', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Quiz.countDocuments(),
+    ]);
 
     const quizzesWithStats = await Promise.all(
       quizzes.map(async (quiz) => {
-        const attempts = await QuizAttempt.find({ quizId: quiz._id });
-        const totalAttempts = attempts.length;
-        const averageScore =
-          attempts.length > 0
-            ? Math.round(
-                attempts.reduce((sum, attempt) => sum + attempt.score, 0) /
-                  attempts.length
-              )
-            : 0;
-
+        const [attemptCount, avgResult] = await Promise.all([
+          Attempt.countDocuments({ quizId: quiz._id, status: 'submitted' }),
+          Attempt.aggregate([
+            { $match: { quizId: quiz._id, status: 'submitted' } },
+            { $group: { _id: null, avg: { $avg: '$percentage' } } },
+          ]),
+        ]);
         return {
           ...quiz.toObject(),
-          attempts: totalAttempts,
-          averageScore,
-          questions: quiz.questions.length,
+          attemptCount,
+          avgScore: avgResult.length > 0 ? Math.round(avgResult[0].avg) : 0,
         };
       })
     );
 
-    res.json(quizzesWithStats);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    return sendPaginated(res, quizzesWithStats, { page: Number(page), limit: Number(limit), total, totalPages: Math.ceil(total / Number(limit)) });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Create new quiz
-const createQuiz = async (req, res) => {
-  try {
-    const quizData = {
-      ...req.body,
-      createdBy: req.user._id,
-    };
-
-    const quiz = new Quiz(quizData);
-    await quiz.save();
-
-    res.status(201).json(quiz);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-// Get single quiz
-const getQuizById = async (req, res) => {
-  try {
-    const quiz = await Quiz.findById(req.params.id);
-    if (!quiz) {
-      return res.status(404).json({ message: 'Quiz not found' });
-    }
-    res.json(quiz);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Update quiz
-const updateQuiz = async (req, res) => {
-  try {
-    const quiz = await Quiz.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!quiz) {
-      return res.status(404).json({ message: 'Quiz not found' });
-    }
-
-    res.json(quiz);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-// Delete quiz
-const deleteQuiz = async (req, res) => {
-  try {
-    const quiz = await Quiz.findByIdAndDelete(req.params.id);
-
-    if (!quiz) {
-      return res.status(404).json({ message: 'Quiz not found' });
-    }
-
-    // Delete all attempts for this quiz
-    await QuizAttempt.deleteMany({ quizId: req.params.id });
-
-    res.json({ message: 'Quiz deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// ===============================
-// CATEGORY MANAGEMENT
-// ===============================
-
-// Get all categories
-const getAllCategories = async (req, res) => {
-  try {
-    const categories = await Category.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: categories });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-};
-
-// Get single category
-const getCategoryById = async (req, res) => {
-  try {
-    const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ success: false, message: 'Category not found' });
-    res.status(200).json({ success: true, data: category });
-  } catch (error) {
-    res.status(400).json({ success: false, message: 'Invalid category ID' });
-  }
-};
-
-// Create category
-const createCategory = async (req, res) => {
-  try {
-    const { name, isActive } = req.body;
-    const existing = await Category.findOne({ name });
-    if (existing) return res.status(400).json({ success: false, message: 'Category already exists' });
-
-    const category = await Category.create({ name, isActive });
-    res.status(201).json({ success: true, message: 'Category created successfully', data: category });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-};
-
-// Update category
-const updateCategory = async (req, res) => {
-  try {
-    const { name, isActive } = req.body;
-    const category = await Category.findById(req.params.id);
-
-    if (!category) return res.status(404).json({ success: false, message: 'Category not found' });
-
-    category.name = name || category.name;
-    if (isActive !== undefined) category.isActive = isActive;
-
-    await category.save();
-
-    res.status(200).json({ success: true, message: 'Category updated successfully', data: category });
-  } catch (error) {
-    res.status(400).json({ success: false, message: 'Invalid category ID' });
-  }
-};
-
-// Delete category
-const deleteCategory = async (req, res) => {
-  try {
-    const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ success: false, message: 'Category not found' });
-
-    await category.deleteOne();
-    res.status(200).json({ success: true, message: 'Category deleted successfully' });
-  } catch (error) {
-    res.status(400).json({ success: false, message: 'Invalid category ID' });
-  }
-};
-
-module.exports = {
-  getAllUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-  getAllQuizzes,
-  createQuiz,
-  getQuizById,
-  updateQuiz,
-  deleteQuiz,
-  getAllCategories,
-  getCategoryById,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-}
+module.exports = { getStats, getUsers, updateUser, getQuizzes };
