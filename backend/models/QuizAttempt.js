@@ -1,98 +1,107 @@
 const mongoose = require('mongoose');
 
-const attemptAnswerSchema = new mongoose.Schema({
-  questionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true
+const answerSchema = new mongoose.Schema(
+  {
+    questionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Question',
+      required: true,
+    },
+    selectedOptionId: {
+      type: String,
+      default: null, // null = skipped
+    },
+    isCorrect: {
+      type: Boolean,
+      default: false,
+    },
+    timeSpent: {
+      type: Number, // seconds on this question
+      default: 0,
+    },
   },
-  selectedOption: {
-    type: String,
-    required: true
-  },
-  isCorrect: {
-    type: Boolean,
-    required: true
-  },
-  points: {
-    type: Number,
-    default: 0
-  },
-  timeSpent: {
-    type: Number, // in seconds
-    default: 0
-  }
-});
+  { _id: false }
+);
 
-const quizAttemptSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  quizId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Quiz',
-    required: true
-  },
-  answers: [attemptAnswerSchema],
-  score: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  totalScore: {
-    type: Number,
-    required: true
-  },
-  percentage: {
-    type: Number,
-    required: true,
-    min: 0,
-    max: 100
-  },
-  status: {
-    type: String,
-    enum: ['in-progress', 'completed', 'abandoned'],
-    default: 'in-progress'
-  },
-  startTime: {
-    type: Date,
-    default: Date.now
-  },
-  endTime: {
-    type: Date
-  },
-  duration: {
-    type: Number // in seconds
-  },
-  attemptNumber: {
-    type: Number,
-    default: 1
-  }
-}, {
-  timestamps: true
-});
+const attemptSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    quizId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Quiz',
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['in_progress', 'submitted', 'expired'],
+      default: 'in_progress',
+    },
+    startedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    submittedAt: {
+      type: Date,
+      default: null,
+    },
+    expiresAt: {
+      type: Date,
+      default: null, // set from quiz.duration on start
+    },
+    timeSpent: {
+      type: Number, // total seconds
+      default: 0,
+    },
+    score: {
+      type: Number,
+      default: 0,
+    },
+    totalPoints: {
+      type: Number,
+      default: 0,
+    },
+    percentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    correctCount: {
+      type: Number,
+      default: 0,
+    },
+    wrongCount: {
+      type: Number,
+      default: 0,
+    },
+    skippedCount: {
+      type: Number,
+      default: 0,
+    },
+    isPassed: {
+      type: Boolean,
+      default: false,
+    },
+    answers: [answerSchema],
 
-// Calculate attempt number before saving
-quizAttemptSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    const attemptCount = await this.constructor.countDocuments({
-      userId: this.userId,
-      quizId: this.quizId
-    });
-    this.attemptNumber = attemptCount + 1;
-  }
-  
-  // Calculate duration if endTime is set
-  if (this.endTime && this.startTime) {
-    this.duration = Math.floor((this.endTime - this.startTime) / 1000);
-  }
-  
-  next();
-});
+    // Snapshot of question IDs used in this attempt (for ordering)
+    questionIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Question',
+      },
+    ],
+  },
+  { timestamps: true }
+);
 
-// Index for better query performance
-quizAttemptSchema.index({ userId: 1, quizId: 1 });
-quizAttemptSchema.index({ createdAt: -1 });
+attemptSchema.index({ userId: 1, quizId: 1 });
+attemptSchema.index({ userId: 1, createdAt: -1 });
+attemptSchema.index({ quizId: 1 });
+attemptSchema.index({ status: 1 });
 
-module.exports = mongoose.model('QuizAttempt', quizAttemptSchema);
+module.exports = mongoose.model('Attempt', attemptSchema);
