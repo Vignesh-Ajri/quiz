@@ -21,7 +21,7 @@ const Attempt = require('./models/QuizAttempt');
 
 const seed = async () => {
   await mongoose.connect(process.env.MONGODB_URI);
-  console.log('✅ Connected to MongoDB');
+  console.log('Connected to MongoDB');
 
   // Clear existing data
   await Promise.all([
@@ -31,7 +31,7 @@ const seed = async () => {
     Question.deleteMany({}),
     Attempt.deleteMany({}),
   ]);
-  console.log('🗑️  Cleared existing data');
+  console.log('Cleared existing data');
 
   // ─── Users ────────────────────────────────────────────────────────────────
   const adminPassword = await bcrypt.hash('Admin@123', 12);
@@ -50,7 +50,7 @@ const seed = async () => {
     { name: 'Python', slug: 'python', description: 'Python programming quizzes', icon: '🐍', isPublished: true },
     { name: 'General Knowledge', slug: 'general-knowledge', description: 'GK and aptitude', icon: '🧠', isPublished: true },
   ]);
-  console.log('📁 Categories created');
+  console.log('Categories created');
 
   const [, jsCategory, pythonCategory, gkCategory] = categories;
 
@@ -143,17 +143,17 @@ const seed = async () => {
   const createdGkQuestions = await Question.insertMany(gkQuestions.map(q => ({ ...q, quizId: gkQuiz._id })));
   await Quiz.findByIdAndUpdate(gkQuiz._id, { totalQuestions: createdGkQuestions.length });
 
-  console.log('📝 Quizzes and questions created');
+  console.log('Quizzes and questions created');
 
-  console.log('\n✅ Database seeded successfully!\n');
+  console.log('\nDatabase seeded successfully!\n');
   console.log('─────────────────────────────────────');
-  console.log('🔑 Admin Login:');
-  console.log('   Email:    admin@questly.com');
-  console.log('   Password: Admin@123');
+  console.log('Admin Login:');
+  console.log('Email: admin@questly.com');
+  console.log(' Password: Admin@123');
   console.log('');
-  console.log('👤 Student Login:');
-  console.log('   Email:    student@questly.com');
-  console.log('   Password: Student@123');
+  console.log('Student Login:');
+  console.log('Email: student@questly.com');
+  console.log('Password: Student@123');
   console.log('─────────────────────────────────────\n');
 
   await mongoose.disconnect();
@@ -161,6 +161,6 @@ const seed = async () => {
 };
 
 seed().catch((err) => {
-  console.error('❌ Seed failed:', err);
+  console.error('Seed failed:', err);
   process.exit(1);
 });

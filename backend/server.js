@@ -66,7 +66,7 @@ app.use('/api/v1/admin', adminRoutes);
 
 // ─── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'Questly API is running 🚀', env: process.env.NODE_ENV });
+  res.json({ success: true, message: 'Questly API is running', env: process.env.NODE_ENV });
 });
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ app.use(errorHandler);
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`\n🚀 Questly API running on http://localhost:${PORT}`);
-  console.log(`📦 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🩺 Health: http://localhost:${PORT}/api/health\n`);
+  console.log(`\nQuestly API running on http://localhost:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Health: http://localhost:${PORT}/api/health\n`);
 });

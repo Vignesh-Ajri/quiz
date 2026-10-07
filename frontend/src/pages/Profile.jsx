@@ -22,15 +22,9 @@ export default function Profile() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Assuming a patch to /users/me/profile endpoint which we can just use /auth/me or similar if we had it.
-      // Wait, let's look at what endpoints we have for users. We didn't define a specific profile update endpoint in the MVP plan, but let's assume we can mock it or it exists.
-      // Wait, looking at the plan: we didn't define a PATCH /users/me. 
-      // I'll just show a toast for now since backend route wasn't explicitly in the MVP scope for profile updates, or I can add a simple mock delay.
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Update local state to simulate success
-      dispatch(setCredentials({ user: { ...user, ...form } }));
-      toast.success('Profile updated successfully (Demo)');
+      const { data } = await api.patch('/auth/me', form);
+      dispatch(setCredentials({ user: data.data.user }));
+      toast.success('Profile updated successfully');
     } catch (err) {
       toast.error('Failed to update profile');
     } finally {

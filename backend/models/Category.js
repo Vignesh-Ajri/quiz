@@ -21,7 +21,7 @@ const categorySchema = new mongoose.Schema(
     },
     icon: {
       type: String,
-      default: '📚',
+      default: '',
     },
     parentId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -114,6 +114,19 @@ const getQuestionsAdmin = async (req, res, next) => {
 // GET /api/v1/quizzes/:id/questions/attempt  [STUDENT — NO correctOptionId]
 const getQuestionsForAttempt = async (req, res, next) => {
   try {
+    const QuizAttempt = require('../models/QuizAttempt');
+    
+    // Verify user has an active attempt for this quiz
+    const attempt = await QuizAttempt.findOne({
+      quizId: req.params.id,
+      userId: req.user._id,
+      status: 'in_progress',
+    });
+    
+    if (!attempt) {
+      return sendError(res, 'No active attempt found for this quiz', 403, 'FORBIDDEN');
+    }
+
     const questions = await Question.find({ quizId: req.params.id })
       .select('-correctOptionId -explanation') // Hide answers
       .sort({ order: 1 });

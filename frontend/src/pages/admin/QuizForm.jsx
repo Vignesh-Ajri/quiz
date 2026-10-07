@@ -24,7 +24,7 @@ export default function QuizForm() {
     difficulty: 'easy',
     duration: 0,
     passingScore: 60,
-    status: 'DRAFT',
+    status: 'draft',
   });
 
   useEffect(() => {
@@ -187,8 +187,8 @@ export default function QuizForm() {
               value={form.status}
               onChange={handleChange}
             >
-              <option value="DRAFT">Draft (Hidden from students)</option>
-              <option value="PUBLISHED">Published (Visible to students)</option>
+              <option value="draft">Draft (Hidden from students)</option>
+              <option value="published">Published (Visible to students)</option>
             </select>
           </div>
         </div>

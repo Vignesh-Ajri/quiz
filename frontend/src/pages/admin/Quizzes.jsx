@@ -89,7 +89,7 @@ export default function AdminQuizzes() {
                     <td className="px-6 py-4 text-center">{q.totalQuestions}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                        q.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        q.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                       }`}>
                         {q.status}
                       </span>
