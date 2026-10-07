@@ -30,18 +30,30 @@ export function Navbar() {
             <BookOpen className="h-6 w-6 text-primary" />
             <span className="text-xl font-bold tracking-tight">Questly</span>
           </Link>
-          <Link to="/quizzes" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary hidden sm:block">
-            Browse Quizzes
-          </Link>
+          <div className="hidden sm:flex items-center space-x-4">
+            <Link to="/quizzes" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+              Browse Quizzes
+            </Link>
+            <Link to="/leaderboard" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+              Leaderboard
+            </Link>
+          </div>
         </div>
 
         {/* Right: Auth actions */}
         <div className="flex items-center space-x-4">
           {isAuthenticated ? (
             <>
-              <span className="text-sm text-muted-foreground hidden md:inline-block">
+              <Link to="/profile" className="text-sm text-muted-foreground hover:text-primary hidden md:flex items-center gap-2 mr-2">
+                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center overflow-hidden border">
+                  {user.avatar ? (
+                    <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold">{user.name.charAt(0)}</span>
+                  )}
+                </div>
                 {user.name}
-              </span>
+              </Link>
               {user.role === 'admin' ? (
                 <Link to="/admin" className="text-sm font-medium transition-colors hover:text-primary">
                   Admin Panel
