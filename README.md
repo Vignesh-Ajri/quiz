@@ -128,3 +128,98 @@ npm run dev
 ```
 
 The application will be accessible at `http://localhost:3000`.
+
+---
+
+## DevOps
+
+### Docker
+
+Every service is containerized using multi-stage Dockerfiles to produce lean, secure production images.
+
+| Service  | Base Image        | Strategy                                        |
+|----------|-------------------|-------------------------------------------------|
+| Backend  | node:20-alpine    | Multi-stage: install deps, then copy to runner  |
+| Frontend | nginx:1.27-alpine | Vite build stage, served by Nginx in production |
+| Database | mongo:7.0         | Official image with named volume for persistence|
+
+Run the entire stack locally with a single command:
+
+```bash
+# Copy and fill .env values first
+cp backend/.env.example backend/.env
+
+# Start all services (MongoDB + Backend + Frontend)
+docker compose up --build
+```
+
+Services will start in the correct order via Docker health checks (`mongo` must be healthy before `backend` starts, `backend` must be healthy before `frontend` starts).
+
+Stop and clean up:
+
+```bash
+docker compose down -v
+```
+
+### CI/CD Pipeline (GitHub Actions)
+
+Two automated pipelines run on every push:
+
+**CI (`ci.yml`) — runs on every push and pull request:**
+- Runs `npm audit` on the backend to catch high or critical CVEs.
+- Lints both backend and frontend codebases.
+- Builds the Vite production bundle and uploads it as an artifact.
+- Validates that both Docker images build successfully.
+
+**CD (`cd.yml`) — runs only on version tags (e.g. `v1.0.0`):**
+- Builds versioned Docker images with layer caching.
+- Pushes tagged images to Docker Hub (`latest` and `vX.Y.Z`).
+- Generates a deployment summary in the GitHub Actions UI.
+
+To trigger a release:
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Project Structure (DevOps Artifacts)
+
+```text
+Quiz/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml          # Lint, audit, build on every push
+│       └── cd.yml          # Build and push Docker images on release tag
+├── docker-compose.yml      # Local full-stack orchestration
+├── backend/
+│   ├── Dockerfile          # Multi-stage backend image
+│   ├── .dockerignore
+│   └── .env.example        # Safe template — never commit .env
+└── frontend/
+    ├── Dockerfile          # Vite build → Nginx runner
+    ├── nginx.conf          # SPA routing, gzip, security headers
+    └── .dockerignore
+```
+
+---
+
+## Security
+
+The following security controls are implemented:
+
+| Layer           | Control                                                               |
+|-----------------|-----------------------------------------------------------------------|
+| Transport       | Helmet.js sets secure HTTP headers on every response                  |
+| Authentication  | Access tokens (15 min) + HttpOnly cookie refresh tokens (7 days)     |
+| Token Rotation  | Refresh token rotation with reuse detection and DB invalidation       |
+| Authorization   | RBAC middleware — every admin route requires `role: admin`            |
+| Rate Limiting   | 200 req/15 min globally; 20 req/15 min on auth routes                |
+| Input Limits    | JSON body parser capped at 10 KB                                      |
+| Quiz Security   | Correct answers never sent to client during active attempts           |
+| Answer Scoring  | Scoring is 100% server-side; clients cannot submit their own scores   |
+| Timer           | Attempt expiry enforced on backend; expired attempts auto-close       |
+| Role Validation | Admins cannot change their own role; role values validated server-side|
+| Secrets         | `.env` excluded from git; `.env.example` provided as safe template    |
+| Error Handling  | Stack traces and internal errors suppressed in production mode        |
+| Docker          | Containers run as non-root user; secrets injected via env vars        |
+
