@@ -69,9 +69,21 @@ const getUsers = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { role, isActive } = req.body;
+
+    // Prevent an admin from changing their own role (lockout prevention)
+    if (req.params.id === req.user._id.toString()) {
+      return sendError(res, 'You cannot modify your own account role or status', 403, 'FORBIDDEN');
+    }
+
+    // Validate role value
+    const VALID_ROLES = ['student', 'admin'];
+    if (role && !VALID_ROLES.includes(role)) {
+      return sendError(res, `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
     const updates = {};
     if (role) updates.role = role;
-    if (isActive !== undefined) updates.isActive = isActive;
+    if (isActive !== undefined) updates.isActive = Boolean(isActive);
 
     const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select('-password -refreshToken');
     if (!user) return sendError(res, 'User not found', 404, 'NOT_FOUND');

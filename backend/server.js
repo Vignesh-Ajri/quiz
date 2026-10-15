@@ -66,7 +66,7 @@ app.use('/api/v1/admin', adminRoutes);
 
 // ─── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'Questly API is running', env: process.env.NODE_ENV });
+  res.json({ success: true, message: 'Questly API is running', timestamp: new Date().toISOString() });
 });
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────

@@ -32,8 +32,13 @@ const errorHandler = (err, req, res, next) => {
     return sendError(res, 'Token expired', 401, 'TOKEN_EXPIRED');
   }
 
-  // Default
-  return sendError(res, err.message || 'Internal Server Error', err.statusCode || 500);
+  // Default — hide internal details in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  const message = isProduction && !err.statusCode
+    ? 'An unexpected error occurred. Please try again later.'
+    : err.message || 'Internal Server Error';
+
+  return sendError(res, message, err.statusCode || 500);
 };
 
 module.exports = errorHandler;
